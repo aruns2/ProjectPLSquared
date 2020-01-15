@@ -1,0 +1,171 @@
+---
+title: "PLSquared- Basic Analysis"
+author: "Arun Sharma"
+date: "12/15/2019"
+output: html_document
+---
+```{r global_options, include=TRUE}
+#knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+```{r setup, include=FALSE}
+
+# Loading libraries
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+
+```
+
+```{r}
+
+#loading data for the year 17-18
+Fall1718 <- fread("2018_NWEA/NWEA Fall 2017-hashed.csv")
+Winter1718 <- fread("2018_NWEA/NWEA_Winter_2017-2018-hashed.csv")
+Spring1718 <- fread("2018_NWEA/NWEA_Spring_2017-2018-hashed.csv")
+
+#loading data for the year 19-18
+Fall1819 <- fread("2019_NWEA/NWEA Fall 2018-hashed.csv")
+Winter1819 <- fread("2019_NWEA/NWEA_Winter_2018-2019-hashed.csv")
+Spring1819 <- fread("2019_NWEA/NWEA_Spring_2018-2019-hashed.csv")
+```
+
+
+```{r}
+#merging both years to get thecommulative data
+
+Complete_1718 <- rbind(Fall1718,Winter1718,Spring1718)
+Complete_1819 <- rbind(Fall1819,Winter1819,Spring1819)
+
+```
+
+```{r}
+#playing with data
+#summary(Complete_1718)
+```
+
+```{r}
+#Summarising the data by student performance
+
+Summary_Student_1718 <- Complete_1718 %>%
+  group_by(StudentID, TermName, Discipline) %>%
+  summarise(count = n(), avg.RIT = mean(TestRITScore), percentile =  mean(TestPercentile))
+
+head(Summary_Student_1718)
+
+```
+
+```{r}
+
+Summary_school_1718 <- Complete_1718 %>%
+  group_by(SchoolName, TestName) %>%
+  summarise(count = n(), avg.RIT = mean(TestRITScore), percentile =  mean(TestPercentile))
+
+Summary_school_1718
+```
+
+```{r, fig.width= 10, fig.height=10}
+#removing the middle school, comparing only elementary schools, cleaning with little data
+Elementaryschools_1718 <- Complete_1718[!Complete_1718$SchoolName %in% "Elizabeth Forward Middle School"&
+                                        !Complete_1718$TestName %in% "Screening: Math 2-5 PA 2013" &
+                                        !Complete_1718$TestName %in% "Screening: Reading 2-5 PA 2013" &
+                                        !Complete_1718$TestName %in% "Growth: Language 2-12 PA 2013" ,]
+Elementaryschools_1718 <-  Elementaryschools_1718 %>%
+  filter(!is.na(TestRITScore))
+
+#Summarising school wise
+
+Box_plot_schools <- Elementaryschools_1718 %>%
+  group_by(SchoolName) %>%
+  ggplot(aes(x= SchoolName, y = TestRITScore, fill = SchoolName))+ 
+  facet_wrap("TestName")+
+  geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) 
+
+Box_plot_schools
+
+```
+
+```{r, fig.width=10, fig.height=10}
+Elementary.maths.2_5_1718 <- Complete_1718[Complete_1718$TestName %in% "Growth: Math 2-5 PA 2013",]
+Elementary.maths.2_5_1718.summary <- Elementary.maths.2_5_1718 %>%
+  group_by(SchoolName) %>%
+  summarise( count = n(), avg.rit.score = mean (TestRITScore), lower = t.test(TestRITScore, mu =0)$conf.int[1], upper = t.test(TestRITScore, mu =0)$conf.int[2])
+
+Elementary.maths.2_5_1718.summary %>%
+  ggplot(aes( x= SchoolName, y= avg.rit.score, fill = SchoolName)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                width =0.4,
+                position = position_dodge(0.9)) +
+  coord_cartesian(ylim = c(175,215)) +
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth : Math 2-5 PA 2013 Scores distribution by schools")
+
+#anova for variation with in Math score across schools
+
+aov(data = Elementary.maths.2_5_1718, TestRITScore ~ SchoolName)
+  
+```
+
+```{r}
+demographicInfo <- fread(input = "Studnet ID_IEP_Econ_Ethn_EF-hashed.csv")
+names(demographicInfo)[1] <- names(Summary_Student_1718)[1]
+Summary_Student_1718 <- merge(Summary_Student_1718, demographicInfo)
+
+
+
+# combining the entire data with demographic characteristics
+Complete_1718 <- merge(Complete_1718 , demographicInfo)
+Complete_1819 <- merge(Complete_1819, demographicInfo)
+
+```
+
+```{r}
+#distribution by schools
+
+demographic.distribution <- Complete_1718 %>%
+  count(SchoolName, Ethnicity) %>%
+  mutate(prop = prop.table(n))
+
+
+demographic.distribution %>%
+  ggplot(aes( x= SchoolName, y = n, fill = Ethnicity)) +
+  geom_bar(stat= "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1))
+```
+
+```{r, fig.width= 10, fig.height=10}
+
+#Ethnicity wise RIT scores
+Elementaryschools.demo_1718 <- Complete_1718[!Complete_1718$SchoolName %in% "Elizabeth Forward Middle School"&
+                                        !Complete_1718$TestName %in% "Screening: Math 2-5 PA 2013" &
+                                        !Complete_1718$TestName %in% "Screening: Reading 2-5 PA 2013" &
+                                        !Complete_1718$TestName %in% "Growth: Language 2-12 PA 2013" ,]
+
+boxplot.demo_1718 <- Elementaryschools.demo_1718 %>%
+  group_by(SchoolName,TestName, Ethnicity) %>%
+   ggplot( aes( x = Ethnicity, y = TestRITScore, fill = Ethnicity)) +
+  geom_boxplot() +
+  facet_wrap(vars(SchoolName, TestName)) +
+    ggtitle("BoxPlots depicting average RIT scores for different races across Schools")
+boxplot.demo_1718 
+
+```
+```{r, fig.width=10, fig.height=10}
+Elementaryschools.demo_1718 <- mutate(
+  Elementaryschools.demo_1718, EconDis = recode_factor(Elementaryschools.demo_1718$EconDis, `1` ="Not Ecnonmically Disadvantage", `0` = "Ecnonmically Disadvantage"))
+
+boxplot.demo_1718 <- Elementaryschools.demo_1718 %>%
+  group_by(SchoolName,TestName, EconDis) %>%
+   ggplot( aes( x = EconDis, y = TestRITScore, fill = EconDis)) +
+  geom_boxplot() +
+  facet_wrap(vars(SchoolName, TestName)) +
+    ggtitle("BoxPlots depicting average RIT scores for different Econmic Disadvantageous Kids across Schools")+
+   theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1))
+
+boxplot.demo_1718 
+
+```
+
