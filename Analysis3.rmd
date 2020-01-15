@@ -1,0 +1,109 @@
+
+---
+title: "Analysis 3- Modelling students over summer slide for different stage at schooling"
+author: "Arun Sharma"
+date: "1/1/2020"
+output: 
+  html_document:
+    theme: paper
+    highlight: tango
+    toc: true
+    toc_depth: 5
+---
+
+```{r global_options, include=FALSE, fig.width = 10}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(sqldf)
+library(data.table)
+```
+
+```{r}
+
+rm(list=ls())
+
+
+#getting the data for the year 2017-18
+Fall1718 <- fread("2018_NWEA/NWEA Fall 2017-hashed.csv")
+Winter1718 <- fread("2018_NWEA/NWEA_Winter_2017-2018-hashed.csv")
+Spring1718 <- fread("2018_NWEA/NWEA_Spring_2017-2018-hashed.csv")
+
+
+#getting the data for the year 2018-19
+Fall1819 <- fread("2019_NWEA/NWEA Fall 2018-hashed.csv")
+Winter1819 <- fread("2019_NWEA/NWEA_Winter_2018-2019-hashed.csv")
+Spring1819 <- fread("2019_NWEA/NWEA_Spring_2018-2019-hashed.csv")
+
+LongData_1718 <- rbind(Fall1718,Winter1718,Spring1718)
+LongData_1819 <- rbind(Fall1819,Winter1819,Spring1819)
+
+student.analysis1 <- rbind(LongData_1718, LongData_1819)
+
+#getting data for students who transitioned from elementary to middle:ref Analysis2.rmd
+filtered1718 <- fread("filtered1718.csv")
+filtered1819 <- fread("filtered1819.csv")
+
+analysis.data <- rbind(filtered1718, filtered1819)
+
+analysis.data <- filter(analysis.data, is.middle == 1)
+```
+
+```{r}
+middle.transition <- analysis.data
+middle.transition <- select(middle.transition, -"is.middle")
+
+middle.transition$level <- 2
+
+#total student who did not transition to a middle school
+nomiddle.transition <- student.analysis1[ !(student.analysis1$StudentID %in% analysis.data$StudentID),]
+
+#student who moved to elementary from elementary in second year
+nomiddle.transition.elementary <- nomiddle.transition[!(nomiddle.transition$SchoolName == "Elizabeth Forward Middle School")]
+nomiddle.transition.elementary$level <- 1
+
+#student who moved to middle from middle in second year
+nomiddle.transition.middle <- nomiddle.transition[(nomiddle.transition$SchoolName == "Elizabeth Forward Middle School")]
+nomiddle.transition.middle$level <- 3
+
+comb.data <- rbind(nomiddle.transition.elementary, middle.transition, nomiddle.transition.middle)
+```
+
+
+```{r}
+final <- comb.data[comb.data$TermName %in% c("Spring 2017-2018", "Fall 2018-2019") & comb.data$Discipline == "Mathematics",]
+
+final <- final %>%
+  group_by(StudentID) %>%
+  mutate(diff = (TestRITScore - lag(TestRITScore)))
+
+final <- final[!is.na(final$diff),]
+final <- final[!is.na(final$TestRITScore),]
+
+#mean summer slide
+level.sum <- final %>%
+  group_by(level)%>%
+  summarise(mean = mean(diff))
+level.sum
+
+#lm for summer slide with increasing levels-> elementary-elementary; elementary-middle; middle-middle
+model <- lm(diff~level, data = final)
+summary(model)
+#summary(model)
+plot(model)
+
+#one sided t test for seeing summer slide in students for level 1 and level 3
+final <- final[final$level %in% c(1,3),]
+
+t.test(diff~level, alternative = "less", data = final)
+
+#t.test to see if there is a summer slide; two sided test with mu =0
+final2 <- comb.data[comb.data$TermName %in% c("Spring 2017-2018", "Fall 2018-2019") & comb.data$Discipline == "Mathematics",]
+final2$TermName <- as.factor(final2$TermName)
+str(final2$TermName)
+t.test(TestRITScore~TermName, data = final2)
+```
