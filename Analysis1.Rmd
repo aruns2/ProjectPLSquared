@@ -1,0 +1,331 @@
+---
+title: "Analysis 1- Comparing transition to middle school"
+author: "Arun Sharma"
+date: "1/1/2020"
+output: 
+  html_document:
+    theme: paper
+    highlight: tango
+    toc: true
+    toc_depth: 5
+---
+
+```{r global_options, include=FALSE, fig.width = 10}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(sqldf)
+```
+
+# Estimatng the growth pattern amongst students into the middle school
+
+
+## Imports
+```{r}
+rm(list=ls())
+library(data.table)
+
+#getting the data for the year 2017-18
+Fall1718 <- fread("2018_NWEA/NWEA Fall 2017-hashed.csv")
+Winter1718 <- fread("2018_NWEA/NWEA_Winter_2017-2018-hashed.csv")
+Spring1718 <- fread("2018_NWEA/NWEA_Spring_2017-2018-hashed.csv")
+
+
+#getting the data for the year 2018-19
+Fall1819 <- fread("2019_NWEA/NWEA Fall 2018-hashed.csv")
+Winter1819 <- fread("2019_NWEA/NWEA_Winter_2018-2019-hashed.csv")
+Spring1819 <- fread("2019_NWEA/NWEA_Spring_2018-2019-hashed.csv")
+
+#read only elementary students from 17-18 and only middle school students from 18-19
+combined.elementary1718 <- fread("2017-18 elementary.csv")
+combined.middle1819 <- fread("2018-19 middleschool.csv")
+```
+
+```{r}
+#identifying the middle school students , create a new column and set it to zero
+combined.elementary1718$is.middle <- 0
+combined.middle1819$is.middle <- 0
+
+```
+
+
+```{r}
+LongData_1718 <- rbind(Fall1718,Winter1718,Spring1718)
+LongData_1819 <- rbind(Fall1819,Winter1819,Spring1819)
+
+student.analysis1 <- rbind(LongData_1718, LongData_1819)
+
+#total number of students prior to analysis
+total.number <- student.analysis1 %>%
+  group_by(StudentID)%>%
+  summarise(n())
+
+nrow(total.number)
+```
+## Number of students in each schools for 17-18 and 18-19
+```{r}
+#Greenock
+greenock1718 <- LongData_1718[LongData_1718$SchoolName == "Greenock Elementary"]
+greenock1819 <- LongData_1819[LongData_1819$SchoolName == "Greenock Elementary"]
+
+#central Elementary
+central1718 <- LongData_1718[LongData_1718$SchoolName == "Central Elementary"]
+central1819 <- LongData_1819[LongData_1819$SchoolName == "Central Elementary"]
+
+#Mount Vernon Elementary
+mountvernon1718 <- LongData_1718[LongData_1718$SchoolName == "Mount Vernon Elementary"]
+mountvernon1819 <- LongData_1819[LongData_1819$SchoolName == "Mount Vernon Elementary"]
+
+#William Penn Elementary
+williampenn1718 <- LongData_1718[LongData_1718$SchoolName == "William Penn Elementary"]
+williampenn1819 <- LongData_1819[LongData_1819$SchoolName == "William Penn Elementary"]
+
+#Elizabeth Forward Middle School
+Elizabethmiddle1718 <- LongData_1718[LongData_1718$SchoolName == "Elizabeth Forward Middle School"]
+Elizabethmiddle1819 <- LongData_1819[LongData_1819$SchoolName == "Elizabeth Forward Middle School"]
+```
+
+```{r}
+
+number.students <- c(rapply(greenock1718[,2], function(x)length(unique(x))),
+rapply(greenock1819[,2], function(x)length(unique(x))),
+
+rapply(central1718[,2], function(x)length(unique(x))),
+rapply(central1819[,2], function(x)length(unique(x))),
+
+
+rapply(williampenn1718[,2], function(x)length(unique(x))),
+rapply(williampenn1819[,2], function(x)length(unique(x))),
+
+rapply(mountvernon1718[,2], function(x)length(unique(x))),
+rapply(mountvernon1819[,2], function(x)length(unique(x))),
+
+rapply(Elizabethmiddle1718[,2], function(x)length(unique(x))),
+rapply(Elizabethmiddle1819[,2], function(x)length(unique(x))))
+
+
+
+Schools <- c("Greenock1718", "Greenock1819", "Central1718", "Central1819", "Williampenn1718", "Williampenn1819","Mountvernon1718", "MountVernon1819", "ElizabethMiddle1718", "Elizabethmiddle1819")
+
+df <- data.frame(Schools,number.students)
+df
+
+```
+####?data Identifying those students who were in elementary schools for 17-18 and middle school in 18-19
+
+for (i in 1:nrow(combined.elementary1718)) {
+  for(j in 1:nrow(combined.middle1819)){
+    if(combined.elementary1718[[i,2]] == combined.middle1819[[j,2]]){
+      combined.elementary1718$is.middle[i] <- 1
+      combined.middle1819$is.middle[j] <- 1
+    }
+    
+  }
+  
+}
+
+
+
+```{r}
+filtered1718 <- fread("filtered1718.csv")
+filtered1819 <- fread("filtered1819.csv")
+```
+
+```{r}
+analysis.data <- rbind(filtered1718, filtered1819)
+number.students <- analysis.data %>%
+  group_by(StudentID)%>%
+  summarise(n())
+nrow(number.students)
+```
+
+```{r}
+analysis.data <- filter(analysis.data, is.middle == 1)
+nomiddle.transition <- student.analysis1[ !(student.analysis1$StudentID %in% analysis.data$StudentID),]
+
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+analysis.data <- filter(analysis.data, (Discipline != "Language" & Discipline != "Science"))
+
+str(as.factor(analysis.data$Discipline))
+elementary.middle.data <- analysis.data %>%
+  group_by(StudentID)%>%
+  summarise(n())
+
+nrow(elementary.middle.data)
+```
+```{r}
+df <- student.analysis1[ !(student.analysis1$StudentID %in% analysis.data)]
+```
+
+Of the total students = `r nrow(total.number)`, only `r nrow(elementary.middle.data)` were those who went to elementary school in 2017-18 and graduated to middle school in 2018-19.
+
+
+```{r, fig.width = 10, fig.height=10}
+analysis.data.sum <- analysis.data %>%
+  group_by(StudentID, SchoolName, Discipline) %>%
+  summarise( rit.score = mean(TestRITScore))
+
+
+analysis.data.sum %>%
+  ggplot(aes(y= rit.score, x=SchoolName, fill = Discipline))+
+  geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Discipline wise Avg RIT scores for different Elementary and Middle School")
+
+```
+
+```{r}
+analysis.data <- analysis.data %>%
+  group_by(StudentID, TermName, Discipline) %>%
+  summarise( rit.score = mean(TestRITScore))
+nrow(analysis.data)
+```
+
+```{r}
+#merge demographic info
+demographicInfo <- fread(input = "Studnet ID_IEP_Econ_Ethn_EF-hashed.csv")
+names(demographicInfo)[1] <- names(analysis.data)[1]
+analysis.data<- merge(analysis.data,demographicInfo)
+summary(as.factor(analysis.data$Ethnicity))
+```
+
+
+#### measuring growth rates in elementary and middle school for the same student
+
+```{r, fig.width = 10, fig,height = 10}
+
+#recofing factors
+analysis.data$term <- analysis.data$TermName
+analysis.data <- mutate(analysis.data, term = recode_factor(analysis.data$term, `1` = "Fall 2017-2018", `2` = "Winter 2017-2018", `3` = "Spring 2017-2018", `4` = "Fall 2018-2019", `5` = "Winter 2018-2019", `6` = "Spring 2018-2019" ))
+analysis.data$TermName <- factor (analysis.data$TermName, levels = c("Fall 2017-2018", "Winter 2017-2018", "Spring 2017-2018", "Fall 2018-2019", "Winter 2018-2019", "Spring 2018-2019"))
+#converting levels into integers for geom_line()
+g<- analysis.data$term
+g <- as.integer(g)
+analysis.data$term <- g
+
+
+avg.race.maths <- analysis.data[analysis.data$Discipline=="Mathematics"&analysis.data$Ethnicity%in%c("B","H","W"),] %>% 
+        group_by(Ethnicity, term) %>% 
+        summarise(rit.score = mean(rit.score), count = n())
+avg.race.maths
+
+
+#plot for mathematics
+ggplot(analysis.data[analysis.data$Discipline=="Mathematics"&analysis.data$Ethnicity%in%c("B","H","W"),], 
+       aes(TermName, y = rit.score, color = Ethnicity)) + 
+  geom_line(aes(group = StudentID), alpha = .3) + 
+  geom_line(data = avg.race.maths, aes(x = term, y = rit.score, color = Ethnicity), alpha = 1, size = 2)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth Mathematics : From elementary to middle school for different ethnicities")
+
+
+#plot for reading
+
+avg.race.reading <- analysis.data[analysis.data$Discipline=="Reading"&analysis.data$Ethnicity%in%c("B","H","W"),] %>% 
+        group_by(Ethnicity, term) %>% 
+        summarise(rit.score = mean(rit.score), count = n())
+avg.race.reading
+
+#plot for reading
+ggplot(analysis.data[analysis.data$Discipline=="Reading"&analysis.data$Ethnicity%in%c("B","H","W"),], aes(x = TermName, y = rit.score, color = Ethnicity)) + 
+  geom_line(aes(group = StudentID), alpha = .3) + 
+  geom_line(data = avg.race.reading, aes(x = term, y = rit.score, color = Ethnicity), alpha = 1, size = 2)+
+  theme_bw()+
+   theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth Reading : From elementary to middle school for different ethnicities")
+  
+```
+
+```{r, fig.width = 10, fig.height = 10}
+avg.rit.econdis <- analysis.data[analysis.data$Discipline=="Mathematics"&analysis.data$EconDis%in%c("1","0", NA),] %>% 
+        group_by(EconDis, term) %>% 
+        summarise(avg.rit = mean(rit.score), count = n())
+
+avg.rit.econdis$economy <- avg.rit.econdis$EconDis
+avg.rit.econdis$EconDisLabel <- ifelse(avg.rit.econdis$EconDis==0,"Economically Disadvantaged",ifelse(avg.rit.econdis$EconDis==1,"Not Economically Disadvataged",NA))
+avg.rit.econdis
+```
+```{r, fig.width = 10, fig.height =10}
+
+analysis.data$economy <- analysis.data$EconDis
+analysis.data$economy <- ifelse(analysis.data$economy==0,"Economically Disadvantaged",ifelse(analysis.data$economy==1,"Not Economically Disadvataged",NA))
+
+ggplot(analysis.data[analysis.data$Discipline=="Mathematics"&analysis.data$EconDis%in%c("1","0", NA),], 
+       aes(x= TermName, y = rit.score, color = economy)) + 
+  geom_line(aes(group = StudentID), alpha = 1) +
+  geom_line(data = avg.rit.econdis,mapping =  aes(x = term, y = avg.rit, color = EconDisLabel), alpha = 1, size =2) +
+  theme_bw() +
+   theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth Mathematics : From elementary to middle school by economic disadvantage")
+
+```
+
+
+```{r}
+#changing the race for minoritised vs non-minoritised
+analysis.data$new.race <- ifelse(analysis.data$Ethnicity %in% c("B", "H", "O"),0,ifelse(analysis.data$Ethnicity %in% c("W", "A"),1,NA))
+
+analysis.data$race <- ifelse(analysis.data$new.race == 0,"Minoritised",ifelse(analysis.data$new.race == 1, "Non-Minoritised",NA))
+
+
+avg.race.maths <- analysis.data[analysis.data$Discipline=="Mathematics",] %>% 
+        group_by(race, term) %>% 
+        summarise(rit.score = mean(rit.score), count = n())
+avg.race.maths
+
+
+
+#plot for mathematics
+ggplot(analysis.data[analysis.data$Discipline=="Mathematics",], aes(TermName, y = rit.score, color = race)) + 
+  geom_line(aes(group = StudentID), alpha = .3) + 
+  geom_line(data = avg.race.maths, aes(x = term, y = rit.score, color = race), alpha = 1, size = 2)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth Mathematics : From elementary to middle school for minoritised vs non-minoritised")
+
+
+
+#plot for mathematics
+
+avg.race.reading <- analysis.data[analysis.data$Discipline=="Reading",] %>% 
+        group_by(race, term) %>% 
+        summarise(rit.score = mean(rit.score), count = n())
+
+
+
+#plot for mathematics
+ggplot(analysis.data[analysis.data$Discipline=="Reading",], aes(TermName, y = rit.score, color = race)) + 
+  geom_line(aes(group = StudentID), alpha = .3) + 
+  geom_line(data = avg.race.maths, aes(x = term, y = rit.score, color = race), alpha = 1, size = 2)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 60, hjust =1, vjust =1)) +
+  ggtitle("Growth Reading : From elementary to middle school for minoritised vs non-minoritised")
+
+```
+
+```{r}
+#analysis.data.school <- analysis.data %>%
+ # group_by(StudentID, SchoolName, Discipline, TermName) %>%
+  #summarise( rit.score = mean(TestRITScore))
+
+
+
+#analysis.data.school$school <- ifelse(analysis.data.school$SchoolName == "Mount Vernon Elementary",1, #ifelse(analysis.data.school$SchoolName == "Central Elementary", 10, ifelse(analysis.data.school$SchoolName == "William Penn Elementary", #100, NA)))
+
+
+
+
+```
